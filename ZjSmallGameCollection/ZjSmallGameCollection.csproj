@@ -89,6 +89,22 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <None Include="Resources\GameRiver1-1-Back.png" />
+    <None Include="Resources\GameRiver1-2-Back.png" />
+    <None Include="Resources\GameRiver1-3-Back.png" />
+    <None Include="Resources\GameRiver2-1-Back.png" />
+    <None Include="Resources\GameRiver2-3-Back.png" />
+    <None Include="Resources\GameRiver3-1-Back.png" />
+    <None Include="Resources\GameRiver3-3-Back.png" />
+    <None Include="Resources\GameRiver3-2-Back.png" />
+    <Content Include="Resources\GameRiverBack.png" />
+    <Content Include="Resources\GameRiverChessBlack.png" />
+    <Content Include="Resources\GameRiverChessBlackChoosen.png" />
+    <Content Include="Resources\GameRiverChessWhiteChoosen.png" />
+    <Content Include="Resources\GameRiverChessWhite.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
