@@ -52,6 +52,7 @@
     <Compile Include="GameRiver.Designer.cs">
       <DependentUpon>GameRiver.cs</DependentUpon>
     </Compile>
+    <Compile Include="IPlayer.cs" />
     <Compile Include="WelcomeForm.cs">
       <SubType>Form</SubType>
     </Compile>
