@@ -35,6 +35,10 @@ namespace ZjSmallGameCollection
         /// <returns>初始化是否成功</returns>
         bool StartPlay();
         /// <summary>
+        /// 结束游戏通知，用于处理一些数据例如线程
+        /// </summary>
+        void OverPlay();
+        /// <summary>
         /// 开始本玩家回合
         /// </summary>
         void StepOn();
@@ -48,6 +52,11 @@ namespace ZjSmallGameCollection
         PlayerStatue Statue
         {
             get;
+        }
+        string Name
+        {
+            get;
+            set;
         }
         /// <summary>
         /// 当本玩家回合执行完毕之后调用的事件
