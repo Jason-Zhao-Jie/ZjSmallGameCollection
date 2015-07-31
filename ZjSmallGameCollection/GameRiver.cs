@@ -445,6 +445,10 @@ namespace ZjSmallGameCollection
                     player2.StepOn();
                     ShowMessage("游戏开始！轮到白棋回合");
                     break;
+                case "configItem":
+                    if(GameConfig.ShowDialog(this) == DialogResult.OK)
+                        MessageBox.Show("配置保存成功！");
+                    break;
                 case "exitItem":
                     Close();
                     break;
@@ -456,7 +460,8 @@ namespace ZjSmallGameCollection
             mainUIThreadEnd = true;
             player1.OverPlay();
             player2.OverPlay();
-            mainUIThread.Join();
+            if(mainUIThread.ThreadState == ThreadState.Running)
+                mainUIThread.Join();
         }
 
         private void chess_Click(object sender, EventArgs e)
@@ -591,7 +596,8 @@ namespace ZjSmallGameCollection
                 parent.OnClickChess1 -= ClickCall;
             else
                 parent.OnClickChess2 -= ClickCall;
-            mainThread.Join();
+            if(mainThread != null && mainThread.ThreadState == ThreadState.Running)
+                mainThread.Join();
         }
         public void StepOn()
         {

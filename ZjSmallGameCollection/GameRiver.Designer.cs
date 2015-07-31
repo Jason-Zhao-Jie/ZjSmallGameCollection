@@ -31,6 +31,7 @@
             this.mainMain = new System.Windows.Forms.MenuStrip();
             this.gameMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.startNewItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.configItem = new System.Windows.Forms.ToolStripMenuItem();
             this.exitItem = new System.Windows.Forms.ToolStripMenuItem();
             this.messageList = new System.Windows.Forms.ListBox();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
@@ -79,6 +80,7 @@
             // 
             this.gameMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.startNewItem,
+            this.configItem,
             this.exitItem});
             this.gameMenuItem.Name = "gameMenuItem";
             this.gameMenuItem.Size = new System.Drawing.Size(61, 21);
@@ -88,14 +90,21 @@
             // 
             this.startNewItem.Name = "startNewItem";
             this.startNewItem.ShortcutKeys = System.Windows.Forms.Keys.F2;
-            this.startNewItem.Size = new System.Drawing.Size(121, 22);
+            this.startNewItem.Size = new System.Drawing.Size(152, 22);
             this.startNewItem.Text = "开局";
             this.startNewItem.Click += new System.EventHandler(this.gameMenuItem_ChildClick);
+            // 
+            // configItem
+            // 
+            this.configItem.Name = "configItem";
+            this.configItem.Size = new System.Drawing.Size(152, 22);
+            this.configItem.Text = "设置";
+            this.configItem.Click += new System.EventHandler(this.gameMenuItem_ChildClick);
             // 
             // exitItem
             // 
             this.exitItem.Name = "exitItem";
-            this.exitItem.Size = new System.Drawing.Size(121, 22);
+            this.exitItem.Size = new System.Drawing.Size(152, 22);
             this.exitItem.Text = "退出";
             this.exitItem.Click += new System.EventHandler(this.gameMenuItem_ChildClick);
             // 
@@ -368,5 +377,6 @@
         private System.Windows.Forms.Label player2Name;
         private System.Windows.Forms.Label player1Statue;
         private System.Windows.Forms.Label player2Statue;
+        private System.Windows.Forms.ToolStripMenuItem configItem;
     }
 }
