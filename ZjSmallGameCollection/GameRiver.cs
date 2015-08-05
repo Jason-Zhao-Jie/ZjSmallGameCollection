@@ -20,6 +20,7 @@ namespace ZjSmallGameCollection
     }
     public partial class GameRiver : Form
     {
+        private readonly System.Xml.XmlElement cfg;
         /// <summary>玩家1</summary>
         private IGameRiverPlayer player1;
         /// <summary>玩家2</summary>
@@ -56,6 +57,7 @@ namespace ZjSmallGameCollection
             isStepReady = false;
             OnClickChess1 = null;
             OnClickChess2 = null;
+            cfg = GameConfig.GetCfgXml()["GameRiver"];
         }
 
         /// <summary>
@@ -203,7 +205,7 @@ namespace ZjSmallGameCollection
                 if(nrly[i] != 0 && null == res)
                     return true;
             }
-            if(IsAtonceWin()!=0)
+            if(IsAtonceWin() != 0)
                 return true;
             return false;
         }
@@ -230,7 +232,7 @@ namespace ZjSmallGameCollection
             }
             for(int i = 0; i < 8; i++)
             {
-                if(chesses[i] < 0 &&GetAllAbleIndex(i)!=null)
+                if(chesses[i] < 0 && GetAllAbleIndex(i) != null)
                 {
                     enemyFail = false;
                 }
@@ -389,8 +391,32 @@ namespace ZjSmallGameCollection
         private void GameRiver_Load(object sender, EventArgs e)
         {
             ListBox.CheckForIllegalCrossThreadCalls = false;
-            player1 = new GameRiver_Local(this, true);
-            player2 = new GameRiver_Local(this, false);
+            switch(cfg["player1"]["type"].InnerText)
+            {
+                case "local":
+                    player1 = new GameRiver_Local(this, cfg["player1"]["name"].InnerText, true);
+                    break;
+                case "auto":
+                    player1 = new GameRiver_Auto(this, Convert.ToInt32(cfg["player1"]["name"].InnerText), true);
+                    break;
+                case "network":
+                    player1 = new GameRiver_Local(this, cfg["player1"]["name"].InnerText, true);
+                    break;
+            }
+            player1Name.Text = player1.Name;
+            switch(cfg["player2"]["type"].InnerText)
+            {
+                case "local":
+                    player2 = new GameRiver_Local(this, cfg["player2"]["name"].InnerText, false);
+                    break;
+                case "auto":
+                    player2 = new GameRiver_Auto(this, Convert.ToInt32(cfg["player2"]["name"].InnerText), false);
+                    break;
+                case "network":
+                    player2 = new GameRiver_Local(this, cfg["player2"]["name"].InnerText, false);
+                    break;
+            }
+            player2Name.Text = player2.Name;
             pics = new PictureBox[8];
             pics[0] = chess1;
             pics[1] = chess2;
@@ -429,6 +455,7 @@ namespace ZjSmallGameCollection
                 case "startNewItem":
                     if(statue != GameRiverStatue.Resulting && statue != GameRiverStatue.Waiting)
                         return;
+                    bool isBlackFirst = Convert.ToInt32(cfg["isWhiteFirst"].InnerText) == 0;
                     InitChesses();
                     lastChesses[0] = 3;
                     lastChesses[1] = 3;
@@ -441,9 +468,18 @@ namespace ZjSmallGameCollection
                     ShowMessage("初始化完毕！");
                     player1.StartPlay();
                     player2.StartPlay();
-                    statue = GameRiverStatue.OurRound;
-                    player2.StepOn();
-                    ShowMessage("游戏开始！轮到白棋回合");
+                    if(isBlackFirst)
+                    {
+                        statue = GameRiverStatue.EnemyRound;
+                        player1.StepOn();
+                        ShowMessage("游戏开始！轮到黑棋回合");
+                    }
+                    else
+                    {
+                        statue = GameRiverStatue.OurRound;
+                        player2.StepOn();
+                        ShowMessage("游戏开始！轮到白棋回合");
+                    }
                     break;
                 case "configItem":
                     if(GameConfig.ShowDialog(this) == DialogResult.OK)
@@ -561,55 +597,55 @@ namespace ZjSmallGameCollection
             }
         }
     }
-
-    public interface IGameRiverPlayer : IPlayer
-    {
-    }
-
-    sealed public class GameRiver_Local : IGameRiverPlayer
+    /// <summary>
+    /// 继承了玩家接口的GameRiver游戏玩家操作总抽象类
+    /// </summary>
+    public abstract class IGameRiverPlayer : IPlayer
     {
         public bool isEnemy;
-        public GameRiver_Local(GameRiver parent, bool isEnemy = false)
+        public event VoidFunc OnEndStep;
+
+        protected Thread mainThread;
+        protected GameRiver parent;
+        protected PlayerStatue statue;
+        protected string name;
+
+        public IGameRiverPlayer(GameRiver parent, string name, bool isEnemy = false)
         {
             this.parent = parent;
             this.isEnemy = isEnemy;
             statue = PlayerStatue.Unknown;
-            name = "匿名玩家";
+            this.name = name;
         }
-        public bool StartPlay()
+
+        public virtual bool StartPlay()
         {
             System.Diagnostics.Debug.WriteLine("玩家" + (isEnemy ? 1 : 2) + "准备就绪");
             statue = PlayerStatue.Ready;
             mainThread = new Thread(ThreadFunc);
             mainThread.Start();
-            if(isEnemy)
-                parent.OnClickChess1 += ClickCall;
-            else
-                parent.OnClickChess2 += ClickCall;
             return true;
         }
-        public void OverPlay()
+        public virtual void OverPlay()
         {
             System.Diagnostics.Debug.WriteLine("玩家" + (isEnemy ? 1 : 2) + "游戏结束");
             statue = PlayerStatue.Unknown;
-            if(isEnemy)
-                parent.OnClickChess1 -= ClickCall;
-            else
-                parent.OnClickChess2 -= ClickCall;
             if(mainThread != null && mainThread.ThreadState == ThreadState.Running)
                 mainThread.Join();
         }
-        public void StepOn()
+        public virtual void StepOn()
         {
             System.Diagnostics.Debug.WriteLine("玩家" + (isEnemy ? 1 : 2) + "回合开始");
             statue = PlayerStatue.Playing;
         }
-        public PlayerType Type
+        protected abstract void ThreadFunc();
+        protected void CallEndEvent()
         {
-            get
-            {
-                return PlayerType.Local;
-            }
+            OnEndStep();
+        }
+        public virtual PlayerType Type
+        {
+            get;
         }
         public PlayerStatue Statue
         {
@@ -629,14 +665,41 @@ namespace ZjSmallGameCollection
                 name = value;
             }
         }
+    }
+    /// <summary>
+    /// 本机用户操作处理
+    /// </summary>
+    sealed public class GameRiver_Local : IGameRiverPlayer
+    {
+        public GameRiver_Local(GameRiver parent, string name, bool isEnemy = false)
+            : base(parent, name, isEnemy)
+        {
+        }
+        public override bool StartPlay()
+        {
+            if(isEnemy)
+                parent.OnClickChess1 += ClickCall;
+            else
+                parent.OnClickChess2 += ClickCall;
+            return base.StartPlay();
+        }
+        public override void OverPlay()
+        {
+            if(isEnemy)
+                parent.OnClickChess1 -= ClickCall;
+            else
+                parent.OnClickChess2 -= ClickCall;
+            base.OverPlay();
+        }
+        public override PlayerType Type
+        {
+            get
+            {
+                return PlayerType.Local;
+            }
+        }
 
-        public event VoidFunc OnEndStep;
-
-        private Thread mainThread;
-        private GameRiver parent;
-        private PlayerStatue statue;
-        private string name;
-        private void ThreadFunc()
+        protected override void ThreadFunc()
         {
             while(statue != PlayerStatue.Unknown)
             {
@@ -644,7 +707,7 @@ namespace ZjSmallGameCollection
                 {
                     System.Diagnostics.Debug.WriteLine("玩家" + (isEnemy ? 1 : 2) + "回合完成");
                     statue = PlayerStatue.Ready;
-                    OnEndStep();
+                    CallEndEvent();
                 }
                 Thread.Sleep(1);
             }
@@ -664,4 +727,57 @@ namespace ZjSmallGameCollection
             }
         }
     }
+    /// <summary>
+    /// 本机电脑玩家操作处理
+    /// </summary>
+    sealed public class GameRiver_Auto : IGameRiverPlayer
+    {
+        private int delay;
+        public GameRiver_Auto(GameRiver parent, int delay, bool isEnemy = false)
+            : base(parent, "电脑", isEnemy)
+        {
+            this.delay = delay;
+        }
+        public override PlayerType Type
+        {
+            get
+            {
+                return PlayerType.AutoIntel;
+            }
+        }
+        protected override void ThreadFunc()
+        {
+            while(statue != PlayerStatue.Unknown)
+            {
+                if(statue == PlayerStatue.Playing)
+                {
+                    System.Diagnostics.Debug.WriteLine("玩家" + (isEnemy ? 1 : 2) + "正在思考");
+                    Thread.Sleep(this.delay);
+                    //这里进行AI步骤
+                    AnalysisToGo();
+                    System.Diagnostics.Debug.WriteLine("玩家" + (isEnemy ? 1 : 2) + "回合完成");
+                    statue = PlayerStatue.Ready;
+                    CallEndEvent();
+                }
+                Thread.Sleep(1);
+            }
+        }
+
+        private void AnalysisToGo()
+        {
+            var steps = GetAllAvailableStep();
+            if(steps == null)
+                throw new Exception("No available steps to go");
+            var step = new KeyValuePair<int, int>(steps.First().Key, steps.First().Value);
+        }
+        private map<int, int> GetAllAvailableStep()
+        {
+            return null;
+        }
+        private byte ScoreStep(int src, int dest)
+        {
+            return 0;
+        }
+    }
 }
+
