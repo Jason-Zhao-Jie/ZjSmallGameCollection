@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -11,6 +12,7 @@ using System.Windows.Forms;
 
 namespace ZjSmallGameCollection
 {
+    using IntPairList = System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<int, int>>;
     public enum GameRiverStatue
     {
         Waiting,
@@ -20,7 +22,7 @@ namespace ZjSmallGameCollection
     }
     public partial class GameRiver : Form
     {
-        private readonly System.Xml.XmlElement cfg;
+        private System.Xml.XmlElement cfg;
         /// <summary>玩家1</summary>
         private IGameRiverPlayer player1;
         /// <summary>玩家2</summary>
@@ -210,6 +212,85 @@ namespace ZjSmallGameCollection
             return false;
         }
         /// <summary>
+        /// 按此走棋能否让我方棋子处于一个角落处，这在AI思维里比随意走棋优先级高
+        /// 如果我方只剩两颗棋，则只要相邻就返回true
+        /// </summary>
+        /// <param name="src">目标棋子</param>
+        /// <param name="dest">目标地点</param>
+        /// <returns>三棋处于一个角落，或仅剩的两棋相邻，返回true</returns>
+        public bool WillBeAllNear(int src, int dest)
+        {
+            int num = 0;
+            if(chesses[src] < 0)
+            {
+                num = Enemies;
+            }
+            else if(chesses[src] > 0)
+            {
+                num = Ours;
+            }
+            else
+                throw new Exception("The chess founded in " + src + " is missed !");
+            if(chesses[dest]!=0)
+                throw new Exception("The chess going to " + dest + " is not empty !");
+
+            if(num == 2)
+            {
+                var res = GetAllNearIndex(dest, src);
+                for(int i = 0; res != null && i < res.Length; i++)
+                {
+                    if(chesses[src] * chesses[res[i]] > 0)
+                        return true;
+                }
+            }
+            else if(num == 3)
+            {
+                int[] total = { -1, -1};
+                int index = 0;
+                var res = GetAllNearIndex(dest, src);
+                for(int i = 0; res != null && i < res.Length; i++)
+                {
+                    if(chesses[src] * chesses[res[i]] > 0)
+                        total[index++] = res[i];
+                    if(index >= 2)
+                    {
+                        if(dest % 2 == 0)
+                        {
+                            if(total[0] == dest + 1 && total[1] == dest - 1)
+                                return true;
+                            if(total[0] == dest - 1 && total[1] == dest + 1)
+                                return true;
+                            if(dest == 0 && total[0] == 7 && total[1] == 1)
+                                return true;
+                            if(dest == 0 && total[0] == 1 && total[1] == 7)
+                                return true;
+                        }
+                        else
+                        {
+                            if(total[0] == dest + 1 && total[1] == dest + 2)
+                                return true;
+                            if(total[1] == dest + 1 && total[0] == dest + 2)
+                                return true;
+                            if(total[0] == dest - 1 && total[1] == dest - 2)
+                                return true;
+                            if(total[1] == dest - 1 && total[0] == dest - 2)
+                                return true;
+                            if(dest == 8 && total[0] == 0 && total[1] == 1)
+                                return true;
+                            if(dest == 8 && total[1] == 0 && total[0] == 1)
+                                return true;
+                            if(dest == 1 && total[0] == 0 && total[1] == 8)
+                                return true;
+                            if(dest == 1 && total[1] == 0 && total[0] == 8)
+                                return true;
+                        }
+                    }
+                }
+            }
+            
+            return false;
+        }
+        /// <summary>
         /// 是否获胜，是否对方无棋可走
         /// </summary>
         /// <param name="ignored">将要走的棋子</param>
@@ -391,13 +472,30 @@ namespace ZjSmallGameCollection
         private void GameRiver_Load(object sender, EventArgs e)
         {
             ListBox.CheckForIllegalCrossThreadCalls = false;
+            pics = new PictureBox[8];
+            pics[0] = chess1;
+            pics[1] = chess2;
+            pics[2] = chess3;
+            pics[3] = chess4;
+            pics[4] = chess5;
+            pics[5] = chess6;
+            pics[6] = chess7;
+            pics[7] = chess8;
+            InitPlayers();
+            mainUIThread = new Thread(mainUIThreadFunc);
+            mainUIThreadEnd = false;
+            mainUIThread.Start();
+        }
+
+        private void InitPlayers()
+        {
             switch(cfg["player1"]["type"].InnerText)
             {
                 case "local":
                     player1 = new GameRiver_Local(this, cfg["player1"]["name"].InnerText, true);
                     break;
                 case "auto":
-                    player1 = new GameRiver_Auto(this, Convert.ToInt32(cfg["player1"]["name"].InnerText), true);
+                    player1 = new GameRiver_Auto(this, Convert.ToInt32(cfg["player1"]["AIdt"].InnerText), true);
                     break;
                 case "network":
                     player1 = new GameRiver_Local(this, cfg["player1"]["name"].InnerText, true);
@@ -410,22 +508,13 @@ namespace ZjSmallGameCollection
                     player2 = new GameRiver_Local(this, cfg["player2"]["name"].InnerText, false);
                     break;
                 case "auto":
-                    player2 = new GameRiver_Auto(this, Convert.ToInt32(cfg["player2"]["name"].InnerText), false);
+                    player2 = new GameRiver_Auto(this, Convert.ToInt32(cfg["player2"]["AIdt"].InnerText), false);
                     break;
                 case "network":
                     player2 = new GameRiver_Local(this, cfg["player2"]["name"].InnerText, false);
                     break;
             }
             player2Name.Text = player2.Name;
-            pics = new PictureBox[8];
-            pics[0] = chess1;
-            pics[1] = chess2;
-            pics[2] = chess3;
-            pics[3] = chess4;
-            pics[4] = chess5;
-            pics[5] = chess6;
-            pics[6] = chess7;
-            pics[7] = chess8;
             player1.OnEndStep += () =>
             {
                 statue = GameRiverStatue.OurRound;
@@ -442,9 +531,6 @@ namespace ZjSmallGameCollection
                 player1.StepOn();
                 ShowMessage("白棋走毕，轮到黑棋回合");
             };
-            mainUIThread = new Thread(mainUIThreadFunc);
-            mainUIThreadEnd = false;
-            mainUIThread.Start();
         }
 
         private void gameMenuItem_ChildClick(object sender, EventArgs e)
@@ -466,6 +552,7 @@ namespace ZjSmallGameCollection
                     lastChesses[6] = 3;
                     lastChesses[7] = 3;
                     ShowMessage("初始化完毕！");
+                    InitPlayers();
                     player1.StartPlay();
                     player2.StartPlay();
                     if(isBlackFirst)
@@ -483,7 +570,10 @@ namespace ZjSmallGameCollection
                     break;
                 case "configItem":
                     if(GameConfig.ShowDialog(this) == DialogResult.OK)
+                    {
+                        cfg = GameConfig.GetCfgXml()["GameRiver"];
                         MessageBox.Show("配置保存成功！");
+                    }
                     break;
                 case "exitItem":
                     Close();
@@ -766,17 +856,57 @@ namespace ZjSmallGameCollection
         private void AnalysisToGo()
         {
             var steps = GetAllAvailableStep();
-            if(steps == null)
+            if(steps == null || steps.Count <= 0)
                 throw new Exception("No available steps to go");
-            var step = new KeyValuePair<int, int>(steps.First().Key, steps.First().Value);
+            var step = steps.First();
+            var score = ScoreStep(step.Key, step.Value);
+            System.Diagnostics.Debug.WriteLine("AI 获取总共可走步骤数：" + steps.Count);
+            System.Diagnostics.Debug.WriteLine("AI 获取可走步骤：" + step.Key + " -> " + step.Value + " ,评分：" + score);
+
+
+            for(int i = 1; i < steps.Count; i++)
+            {
+                System.Diagnostics.Debug.WriteLine("AI 获取可走步骤：" + steps[i].Key + " -> " + steps[i].Value + " ,评分：" + ScoreStep(steps[i].Key, steps[i].Value));
+                if(ScoreStep(steps[i].Key, steps[i].Value) > score)
+                {
+                    step = steps[i];
+                    score = ScoreStep(step.Key, step.Value);
+                }
+            }
+            parent.StepOn(step.Key, step.Value);
         }
-        private map<int, int> GetAllAvailableStep()
+
+        private IntPairList GetAllAvailableStep()
         {
-            return null;
+            var ret = new IntPairList();
+            for(int i = 0; i < 8; i++)
+            {
+                if((isEnemy && parent[i] >= 0) || (!isEnemy && parent[i] <= 0))
+                    continue;
+                var keyv = parent.GetAllAbleIndex(i);
+                for(int j = 0; keyv != null && j < keyv.Length; j++)
+                {
+                    var ins = new KeyValuePair<int, int>(i,keyv[j]);
+                    ret.Add(ins);
+                }
+            }
+            return ret;
         }
+
         private byte ScoreStep(int src, int dest)
         {
-            return 0;
+            if(parent.WillEndGame(src, dest))
+                return 100;
+            else if(parent.WillCutEnemy(src, dest))
+                return 80;
+            else if(src % 2 == 0 && dest % 2 == 1)
+                return 40;
+            else if(parent.WillBeAllNear(src, dest))
+                return 20;
+            else if(src % 2 == 1 && dest % 2 == 1)
+                return 10;
+            else
+                return 0;
         }
     }
 }
