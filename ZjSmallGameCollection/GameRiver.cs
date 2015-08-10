@@ -211,6 +211,11 @@ namespace ZjSmallGameCollection
                 return true;
             return false;
         }
+
+        public bool WillBeCut(int src, int dest)
+        {
+            return false;
+        }
         /// <summary>
         /// 按此走棋能否让我方棋子处于一个角落处，这在AI思维里比随意走棋优先级高
         /// 如果我方只剩两颗棋，则只要相邻就返回true
@@ -353,7 +358,7 @@ namespace ZjSmallGameCollection
         /// <returns>即将结束，返回true</returns>
         public bool WillEndGame(int src = -1, int dest = -1)
         {
-            if(IsAtonceWin() != 0)
+            if(IsAtonceWin(src, dest) != 0)
                 return true;
             return false;
         }
@@ -892,21 +897,28 @@ namespace ZjSmallGameCollection
             }
             return ret;
         }
-
+        /// <summary>
+        /// 电脑AI对某个可行步骤的评分，所有可行步骤中评分最高的步骤会被选择
+        /// </summary>
+        /// <param name="src">我方棋子原位置</param>
+        /// <param name="dest">此步骤的目标位置</param>
+        /// <returns>评分值</returns>
         private byte ScoreStep(int src, int dest)
         {
-            if(parent.WillEndGame(src, dest))
+            if(parent.WillEndGame(src, dest))       //如果此步结束游戏
                 return 100;
-            else if(parent.WillCutEnemy(src, dest))
+            else if(parent.WillCutEnemy(src, dest)) //如果此步吃掉棋子
                 return 80;
-            else if(src % 2 == 0 && dest % 2 == 1)
-                return 40;
-            else if(parent.WillBeAllNear(src, dest))
-                return 20;
-            else if(src % 2 == 1 && dest % 2 == 1)
-                return 10;
-            else
+            else if(parent.WillBeCut(src, dest))    //如果此步会令我方棋子进入危险范围
                 return 0;
+            else if(src % 2 == 0 && dest % 2 == 1)  //如果此步从角到中
+                return 40;
+            else if(parent.WillBeAllNear(src, dest))//如果此步让我方棋子集中在一起
+                return 30;
+            else if(src % 2 == 1 && dest % 2 == 1)  //如果此步从中到中
+                return 20;
+            else
+                return 10;
         }
     }
 }
