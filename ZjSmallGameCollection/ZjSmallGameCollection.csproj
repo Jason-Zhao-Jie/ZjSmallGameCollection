@@ -52,6 +52,7 @@
     <Compile Include="GameConfig.Designer.cs">
       <DependentUpon>GameConfig.cs</DependentUpon>
     </Compile>
+    <Compile Include="GameNetwork.cs" />
     <Compile Include="GameRiver.cs">
       <SubType>Form</SubType>
     </Compile>

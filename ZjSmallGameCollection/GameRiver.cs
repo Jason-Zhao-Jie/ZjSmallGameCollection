@@ -214,6 +214,108 @@ namespace ZjSmallGameCollection
 
         public bool WillBeCut(int src, int dest)
         {
+            int[] mine;
+            int[] others;
+            if(chesses[src] > 0)
+            {
+                mine = Ours;
+                others = Enemies;
+            }
+            else
+            {
+                mine = Enemies;
+                others = Ours;
+            }
+
+            for(int i = 0; i < mine.Length; i++)
+            {
+                //本棋子
+                int csM = chesses[mine[i]];
+                if(mine[i] == src)
+                {
+                    mine[i] = dest;
+                }
+                //若在中线
+                if(mine[i] / 2 == 1)
+                    continue;
+                //两个相邻位
+                int a;
+                int b;
+                if(mine[i] == 0)
+                {
+                    a = 7;
+                    b = 1;
+                }
+                else if(mine[i] == 7)
+                {
+                    a = 6;
+                    b = 0;
+                }
+                else
+                {
+                    a = mine[i] - 1;
+                    b = mine[i] + 1;
+                }
+
+                //相邻位的值
+                int csA = chesses[a];
+                if(a == src)
+                    csA = 0;
+                else if(a == dest)
+                    csA = csM;
+                int csB = chesses[b];
+                if(b == src)
+                    csB = 0;
+                else if(b == dest)
+                    csB = csM;
+
+                //相邻有我方棋子
+                if(csA * chesses[mine[i]] > 0 || csA * chesses[mine[i]] > 0)
+                    continue;
+                //相邻无敌方
+                if(csA == 0 && csB == 0)
+                    continue;
+
+                //相邻的后位
+                int a1, a2, b1, b2;
+                if(a == 0)
+                {
+                    a1 = 7;
+                    a2 = 6;
+                }
+                else if(a == 1)
+                {
+                    a1 = 6;
+                    a2 = 5;
+                }
+                else
+                {
+                    a1 = a - 1;
+                    a2 = a - 2;
+                }
+                if(b == 6)
+                {
+                    b1 = 7;
+                    b2 = 0;
+                }
+                else if(b == 7)
+                {
+                    b1 = 0;
+                    b2 = 1;
+                }
+                else
+                {
+                    b1 = b + 1;
+                    b2 = b + 2;
+                }
+                //空相邻点敌方无法到达
+                if(csB == 0 && (b1 == src || b1 == dest || chesses[b1] == 0) && (b2 == src || b2 == dest || chesses[b2] == 0))
+                    continue;
+                if(csA == 0 && (a1 == src || a1 == dest || chesses[a1] == 0) && (a2 == src || a2 == dest || chesses[a2] == 0))
+                    continue;
+                return true;
+            }
+
             return false;
         }
         /// <summary>
@@ -228,15 +330,15 @@ namespace ZjSmallGameCollection
             int num = 0;
             if(chesses[src] < 0)
             {
-                num = Enemies;
+                num = Enemies.Length;
             }
             else if(chesses[src] > 0)
             {
-                num = Ours;
+                num = Ours.Length;
             }
             else
                 throw new Exception("The chess founded in " + src + " is missed !");
-            if(chesses[dest]!=0)
+            if(chesses[dest] != 0)
                 throw new Exception("The chess going to " + dest + " is not empty !");
 
             if(num == 2)
@@ -250,7 +352,7 @@ namespace ZjSmallGameCollection
             }
             else if(num == 3)
             {
-                int[] total = { -1, -1};
+                int[] total = { -1, -1 };
                 int index = 0;
                 var res = GetAllNearIndex(dest, src);
                 for(int i = 0; res != null && i < res.Length; i++)
@@ -292,7 +394,7 @@ namespace ZjSmallGameCollection
                     }
                 }
             }
-            
+
             return false;
         }
         /// <summary>
@@ -397,33 +499,52 @@ namespace ZjSmallGameCollection
             }
         }
         /// <summary>
-        /// 获取敌人（黑方）剩余的棋子总数
+        /// 获取敌人（黑方）剩余的棋子
         /// </summary>
-        public int Enemies
+        public int[] Enemies
         {
             get
             {
-                int res = 0;
+                int[] res;
+                int num = 0;
                 for(int i = 0; i < 8; i++)
                 {
                     if(chesses[i] < 0)
-                        res++;
+                        num++;
+                }
+                res = new int[num];
+                for(int i = 0, j = 0; i < 8; i++)
+                {
+                    if(chesses[i] < 0)
+                    {
+                        res[j] = i;
+                        j++;
+                    }
                 }
                 return res;
             }
         }
         /// <summary>
-        /// 获取我方（红方）剩余的棋子总数
+        /// 获取我方（红方）剩余的棋子
         /// </summary>
-        public int Ours
+        public int[] Ours
         {
             get
             {
-                int res = 0;
+                int num = 0;
                 for(int i = 0; i < 8; i++)
                 {
                     if(chesses[i] > 0)
-                        res++;
+                        num++;
+                }
+                int[] res = new int[num];
+                for(int i = 0, j = 0; i < 8; i++)
+                {
+                    if(chesses[i] > 0)
+                    {
+                        res[j] = i;
+                        j++;
+                    }
                 }
                 return res;
             }
@@ -891,7 +1012,7 @@ namespace ZjSmallGameCollection
                 var keyv = parent.GetAllAbleIndex(i);
                 for(int j = 0; keyv != null && j < keyv.Length; j++)
                 {
-                    var ins = new KeyValuePair<int, int>(i,keyv[j]);
+                    var ins = new KeyValuePair<int, int>(i, keyv[j]);
                     ret.Add(ins);
                 }
             }
@@ -903,22 +1024,23 @@ namespace ZjSmallGameCollection
         /// <param name="src">我方棋子原位置</param>
         /// <param name="dest">此步骤的目标位置</param>
         /// <returns>评分值</returns>
-        private byte ScoreStep(int src, int dest)
+        private int ScoreStep(int src, int dest)
         {
+            int cutScore = 0;
+            if(parent.WillBeCut(src, dest))
+                cutScore += 25;
             if(parent.WillEndGame(src, dest))       //如果此步结束游戏
                 return 100;
             else if(parent.WillCutEnemy(src, dest)) //如果此步吃掉棋子
-                return 80;
-            else if(parent.WillBeCut(src, dest))    //如果此步会令我方棋子进入危险范围
-                return 0;
+                return 90 - cutScore;
             else if(src % 2 == 0 && dest % 2 == 1)  //如果此步从角到中
-                return 40;
+                return 60 - cutScore;
             else if(parent.WillBeAllNear(src, dest))//如果此步让我方棋子集中在一起
-                return 30;
+                return 50 - cutScore;
             else if(src % 2 == 1 && dest % 2 == 1)  //如果此步从中到中
-                return 20;
+                return 40 - cutScore;
             else
-                return 10;
+                return 30 - cutScore;
         }
     }
 }
