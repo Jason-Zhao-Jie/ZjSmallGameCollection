@@ -9,46 +9,41 @@ using System.Threading.Tasks;
 
 namespace ZjSmallGameCollection
 {
+    using ClientList = List<KeyValuePair<Socket, List<ArraySegment<byte>>>>;
     internal class GameNetwork
     {
-        public delegate void SocketCall(IPAddress client, int port, byte[] datas);
-        public delegate void SocketConnCall(IPAddress client, int port);
+        public delegate void SocketCall(Socket clientS, byte[] datas);
+        public delegate void SocketConnCall(Socket clientS);
         internal event VoidFunc OnServerStart = null;
-        internal event SocketConnCall OnConnect = null;
-        internal event SocketCall OnReceive = null;
-        internal event SocketConnCall OnDisconnect = null;
+        internal event SocketConnCall OnServerConnect = null;
+        internal event SocketCall OnServerReceive = null;
+        internal event SocketConnCall OnServerDisconnect = null;
         internal event VoidFunc OnServerStop = null;
+        internal event SocketConnCall OnClientConnect = null;
+        internal event SocketCall OnClientReceive = null;
+        internal event SocketConnCall OnClientDisconnect = null;
 
         private Socket serverS = null;
         private int serverPort = 0;
         private IPAddress[] ips = null;
         private int serverUser = 0;
-        private List<Socket> ServerCs = new List<Socket>(); //服务器的被连接客户端列表
+        private ClientList serverCs = new ClientList(); //服务器的被连接客户端资源列表
 
-<<<<<<< HEAD
         private ClientList clientS = new ClientList();  //本机创建的客户端列表
 
         /// <summary>
         /// 构造函数，创造网络通信管理类对象
         /// </summary>
         /// <param name="serverPort">设定的服务器端口</param>
-=======
-        private List<Socket> clientS = new List<Socket>();  //本机创建的客户端列表
-        
->>>>>>> parent of 31638db... Done the base network frame
         internal GameNetwork(int serverPort)
         {
             this.serverPort = serverPort;
             ips = Dns.GetHostEntry(Dns.GetHostName()).AddressList;
         }
-<<<<<<< HEAD
         /// <summary>
         /// 建立并开启服务器，如果本机服务器已经开启，则仅增加服务器的引用计数器
         /// </summary>
         /// <returns>是否成功</returns>
-=======
-
->>>>>>> parent of 31638db... Done the base network frame
         internal bool OpenServer()
         {
             if(serverS == null)
@@ -56,35 +51,32 @@ namespace ZjSmallGameCollection
                 serverS = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
                 serverS.Bind(new IPEndPoint(ips[0], serverPort));
                 serverS.Listen(16);
-                serverS.BeginAccept(AcceptCall);
+                serverS.BeginAccept(AcceptCall, serverS);
+                if(OnServerStart != null)
+                    OnServerStart();
             }
 
             serverUser++;
             return true;
         }
-<<<<<<< HEAD
         /// <summary>
         /// 关闭服务器，该操作只会减少服务器的引用计数器，如果引用计数器为0，则关闭服务器的监听
         /// </summary>
         /// <param name="isToCloseAll">是否关闭所有服务器引用</param>
         /// <returns>是否成功</returns>
         internal bool CloseServer(bool isToCloseAll = false)
-=======
-
-        internal bool CloseServer()
->>>>>>> parent of 31638db... Done the base network frame
         {
             serverUser--;
             if(isToCloseAll || serverUser <= 0)
             {
                 serverUser = 0;
-                serverS.EndAccept();
                 serverS.Shutdown(SocketShutdown.Both);
                 serverS.Close();
+                if(OnServerStop != null)
+                    OnServerStop();
             }
             return true;
         }
-<<<<<<< HEAD
         /// <summary>
         /// 创建并开启客户端，返回客户端的索引号
         /// </summary>
@@ -273,12 +265,15 @@ namespace ZjSmallGameCollection
                             });
                             clientS.RemoveAt(idx);
                             clientS.Insert(idx, new KeyValuePair<Socket, List<ArraySegment<byte>>>(null, new List<ArraySegment<byte>>()));
-=======
 
-        private void AcceptCall(IAsyncResult res)
-        {
->>>>>>> parent of 31638db... Done the base network frame
-
+                            if(OnClientDisconnect != null)
+                                OnClientDisconnect(src);
+                            break;
+                        }
+                    }
+                }
+            };
+            src.BeginReceive(buffers, SocketFlags.None, recv, src);
         }
 
         virtual protected byte[] BeginToSend(byte[] mess)
