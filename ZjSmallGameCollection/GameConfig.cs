@@ -14,8 +14,8 @@ namespace ZjSmallGameCollection
 {
     public partial class GameConfig : Form
     {
-        static readonly string cfgFile = System.Environment.CurrentDirectory + "\\gameconfig.xml";
-        const string nowVersion = "0.1";
+        private static readonly string cfgFile = System.Environment.CurrentDirectory + "\\gameconfig.xml";
+        public const string nowVersion = "0.1";
         XmlElement cfgXml;
         public GameConfig()
         {
