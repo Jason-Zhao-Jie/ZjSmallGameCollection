@@ -4,12 +4,14 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Windows.Forms;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace ZjSmallGameCollection
 {
-    using ClientList = List<KeyValuePair<Socket, List<ArraySegment<byte>>>>;
+    using ServerConnList = Dictionary<Socket, AGameNetworkHead.ServerClientStatue>;// List<KeyValuePair<Socket, AGameNetworkHead.NetServerStatue>>;
+    using ClientList = List<KeyValuePair<Socket, byte[]>>;
     internal class GameNetwork
     {
         public delegate void SocketCall(Socket clientS, byte[] datas);
@@ -30,14 +32,18 @@ namespace ZjSmallGameCollection
         private ClientList serverCs = new ClientList(); //服务器的被连接客户端资源列表
 
         private ClientList clientS = new ClientList();  //本机创建的客户端列表
+        string appName = null;
+        string appNetTag = null;
 
         /// <summary>
         /// 构造函数，创造网络通信管理类对象
         /// </summary>
         /// <param name="serverPort">设定的服务器端口</param>
-        internal GameNetwork(int serverPort)
+        internal GameNetwork(int serverPort, string appName, string appNetTag)
         {
             this.serverPort = serverPort;
+            this.appName = appName;
+            this.appNetTag = appNetTag;
             ips = Dns.GetHostEntry(Dns.GetHostName()).AddressList;
         }
         /// <summary>
@@ -86,7 +92,7 @@ namespace ZjSmallGameCollection
         internal int CreateClient(IPAddress addr, int port)
         {
             Socket cl = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            KeyValuePair<Socket, List<ArraySegment<byte>>> dest = new KeyValuePair<Socket, List<ArraySegment<byte>>>(cl, new List<ArraySegment<byte>>());
+            KeyValuePair<Socket, byte[]> dest = new KeyValuePair<Socket, byte[]>(cl, new byte[2048]);
             int index = -1;
             try
             {
@@ -116,9 +122,9 @@ namespace ZjSmallGameCollection
                 {
                     var mess = cl.EndReceive(e);
                     if(OnClientReceive != null)
-                        OnClientReceive(cl, dest.Value[0].Array);
+                        OnClientReceive(cl, dest.Value);
                 };
-                BeginToReceive(dest.Value, recv, cl);
+                BeginToReceive(dest.Value, 0, recv, cl);
             }
             catch(ObjectDisposedException)
             {
@@ -126,14 +132,14 @@ namespace ZjSmallGameCollection
                 if(dest.Key != null)
                 {
                     dest.Key.Close();
-                    var idx = clientS.FindIndex((KeyValuePair<Socket, List<ArraySegment<byte>>> obj) =>
+                    var idx = clientS.FindIndex((KeyValuePair<Socket, byte[]> obj) =>
                     {
                         if(obj.Key == dest.Key && obj.Value == dest.Value)
                             return true;
                         return false;
                     });
                     clientS.RemoveAt(idx);
-                    clientS.Insert(idx, new KeyValuePair<Socket, List<ArraySegment<byte>>>(null, new List<ArraySegment<byte>>()));
+                    clientS.Insert(idx, new KeyValuePair<Socket, byte[]>(null, null));
                 }
                 if(OnClientDisconnect != null)
                     OnClientDisconnect(dest.Key);
@@ -153,7 +159,7 @@ namespace ZjSmallGameCollection
                 if(OnClientDisconnect != null)
                     OnClientDisconnect(clientS[index].Key);
                 clientS.RemoveAt(index);
-                clientS.Insert(index, new KeyValuePair<Socket, List<ArraySegment<byte>>>(null, new List<ArraySegment<byte>>()));
+                clientS.Insert(index, new KeyValuePair<Socket, byte[]>(null, null));
                 return true;
             }
             return false;
@@ -199,21 +205,36 @@ namespace ZjSmallGameCollection
 
         private void AcceptCall(IAsyncResult res)
         {
-            KeyValuePair<Socket, List<ArraySegment<byte>>> dest = new KeyValuePair<Socket, List<ArraySegment<byte>>>(null, new List<ArraySegment<byte>>());
+            KeyValuePair<Socket, byte[]> dest = new KeyValuePair<Socket, byte[]>(null, null);
             try
             {
                 var src = serverS.EndAccept(res);
-                dest = new KeyValuePair<Socket, List<ArraySegment<byte>>>(src, new List<ArraySegment<byte>>());
+                dest = new KeyValuePair<Socket, byte[]>(src, new byte[2048]);
                 serverCs.Add(dest);
                 if(OnServerConnect != null)
                     OnServerConnect(src);
                 AsyncCallback recv = (IAsyncResult e) =>
                 {
+                    byte[] tmpBuffer = new byte[2048];
+                    var count = CopyBytesWithoutZero(tmpBuffer, 0, dest.Value);
                     var mess = src.EndReceive(e);
-                    if(OnServerReceive != null)
-                        OnServerReceive(src, dest.Value[0].Array);
+                    Array.Clear(dest.Value, 0, 2048);
+                    var head = new GameProtocol();
+                    var count2 = CopyBytesWithoutZero(tmpBuffer, count, dest.Value);
+                    try
+                    {
+                        head.Bytes = tmpBuffer;
+                        CopyBytesWithoutZero(dest.Value, head.packlen, tmpBuffer, true);
+
+                        if(OnServerReceive != null)
+                            OnServerReceive(src, head.Bytes);
+                    }
+                    catch
+                    {
+
+                    }
                 };
-                BeginToReceive(dest.Value, recv, src);
+                BeginToReceive(dest.Value, 0, recv, src);
             }
             catch(ObjectDisposedException)
             {
@@ -227,14 +248,14 @@ namespace ZjSmallGameCollection
             }
         }
 
-        virtual protected void BeginToReceive(IList<ArraySegment<byte>> buffers, AsyncCallback cb, Socket src)
+        virtual protected void BeginToReceive(byte[] buffers, int startIndex, AsyncCallback cb, Socket src)
         {
             AsyncCallback recv = (IAsyncResult e) =>
             {
                 try
                 {
                     cb(e);
-                    src.BeginReceive(buffers, SocketFlags.None, cb, src);
+                    BeginToReceive(buffers, startIndex, cb, src);
                 }
                 catch(ObjectDisposedException)
                 {
@@ -257,14 +278,14 @@ namespace ZjSmallGameCollection
                         if(clientS[i].Key == src && src != null)
                         {
                             clientS.Remove(clientS[i]);
-                            var idx = clientS.FindIndex((KeyValuePair<Socket, List<ArraySegment<byte>>> obj) =>
+                            var idx = clientS.FindIndex((KeyValuePair<Socket, byte[]> obj) =>
                             {
                                 if(obj.Key == src)
                                     return true;
                                 return false;
                             });
                             clientS.RemoveAt(idx);
-                            clientS.Insert(idx, new KeyValuePair<Socket, List<ArraySegment<byte>>>(null, new List<ArraySegment<byte>>()));
+                            clientS.Insert(idx, new KeyValuePair<Socket, byte[]>(null, null));
 
                             if(OnClientDisconnect != null)
                                 OnClientDisconnect(src);
@@ -273,12 +294,37 @@ namespace ZjSmallGameCollection
                     }
                 }
             };
-            src.BeginReceive(buffers, SocketFlags.None, recv, src);
+            src.BeginReceive(buffers, startIndex, 2048 - startIndex, SocketFlags.None, recv, src);
         }
 
         virtual protected byte[] BeginToSend(byte[] mess)
         {
-            return null;
+            var head = new GameProtocol();
+            head.appname = appName;
+            head.appNetTag = appNetTag;
+            head.dataPack = mess;
+            return head.Bytes;
+        }
+        static protected int CopyBytesWithoutZero(byte[] buffer, int index, byte[] src, bool isCut = false)
+        {
+            int length = src.Length;
+            bool start = false;
+            int ret = -1;
+            if(index >= buffer.Length || index < 0)
+                return 0;
+            for(int i = Math.Min(index + length, buffer.Length - 1); i >= index; i--)
+            {
+                if(src[i - index] != 0 || start)
+                {
+                    start = true;
+                    buffer[i] = src[i - index];
+                    if(isCut)
+                        src[i - index] = 0;
+                }
+                if(!start)
+                    ret = i - index;
+            }
+            return ret;
         }
     }
 
@@ -312,29 +358,29 @@ namespace ZjSmallGameCollection
             }
         }
 
-        byte[] Bytes
+        internal byte[] Bytes
         {
             get
             {
                 byte[] ret = new byte[ByteLen];
                 int index = 0;
 
-                ReplaceByte(ref ret, BitConverter.GetBytes(head), ref index);
-                ReplaceByte(ref ret, BitConverter.GetBytes(packlen), ref index);
-                ReplaceByte(ref ret, BitConverter.GetBytes(version), ref index);
-                ReplaceByte(ref ret, BitConverter.GetBytes(language), ref index);
+                ReplaceByte(ret, BitConverter.GetBytes(head), ref index);
+                ReplaceByte(ret, BitConverter.GetBytes(packlen), ref index);
+                ReplaceByte(ret, BitConverter.GetBytes(version), ref index);
+                ReplaceByte(ret, BitConverter.GetBytes(language), ref index);
 
-                ReplaceByte(ref ret, BitConverter.GetBytes(appNameLen), ref index);
-                ReplaceByte(ref ret, Encoding.UTF8.GetBytes(appname), ref index);
-                ReplaceByte(ref ret, BitConverter.GetBytes(appNetTagLen), ref index);
-                ReplaceByte(ref ret, Encoding.UTF8.GetBytes(appNetTag), ref index);
+                ReplaceByte(ret, BitConverter.GetBytes(appNameLen), ref index);
+                ReplaceByte(ret, Encoding.UTF8.GetBytes(appname), ref index);
+                ReplaceByte(ret, BitConverter.GetBytes(appNetTagLen), ref index);
+                ReplaceByte(ret, Encoding.UTF8.GetBytes(appNetTag), ref index);
                 checksum = Convert.ToByte(ret[3] + ret[11] + ret[13] + ret[15] + ret[15 + appNameLen] + ret[17 + appNameLen] + ret[17 + appNameLen + appNetTagLen]);
-                ReplaceByte(ref ret, new byte[] { checksum }, ref index);
+                ReplaceByte(ret, new byte[] { checksum }, ref index);
 
-                ReplaceByte(ref ret, BitConverter.GetBytes(dataPackLen), ref index);
-                ReplaceByte(ref ret, dataPack, ref index);
-                ReplaceByte(ref ret, BitConverter.GetBytes(nowTime.ToBinary()), ref index);
-                ReplaceByte(ref ret, BitConverter.GetBytes(tail), ref index);
+                ReplaceByte(ret, BitConverter.GetBytes(dataPackLen), ref index);
+                ReplaceByte(ret, dataPack, ref index);
+                ReplaceByte(ret, BitConverter.GetBytes(nowTime.ToBinary()), ref index);
+                ReplaceByte(ret, BitConverter.GetBytes(tail), ref index);
 
                 return ret;
             }
@@ -375,7 +421,7 @@ namespace ZjSmallGameCollection
             }
         }
 
-        private static void ReplaceByte(ref byte[] array, byte[] replaced, ref int index)
+        private static void ReplaceByte(byte[] array, byte[] replaced, ref int index)
         {
             for(int i = index; i < index + replaced.Length; i++)
             {
@@ -384,23 +430,69 @@ namespace ZjSmallGameCollection
             index += replaced.Length;
         }
     }
-
-    internal abstract class IGameNet : GameNetwork
+    
+    internal abstract class AGameNetworkHead
     {
-        internal IGameNet(int port) : base(port)
+        public enum ServerClientStatue : byte
         {
-        }
-        protected override void BeginToReceive(IList<ArraySegment<byte>> buffers, AsyncCallback cb, Socket src)
+            Waiting,
+            Connecting,
+            Connected,
+            Disconnect
+        };
+        static private GameNetwork super = null;
+        static ServerConnList serverState = new ServerConnList();
+        static AGameNetworkHead()
         {
-            AsyncCallback dest = (IAsyncResult e) =>
+            if(super != null)
             {
-                cb(e);
-            };
-            base.BeginToReceive(buffers, dest, src);
+                super.OnServerStart += () =>
+                {
+                    MessageBox.Show("服务器已开启!");
+                };
+                super.OnServerStop += () =>
+                {
+                    MessageBox.Show("服务器已关闭!");
+                };
+                super.OnServerConnect += (Socket clientS) =>
+                {
+                    serverState.Add(clientS, ServerClientStatue.Connecting);
+                    super.ServerSend(clientS, ConnMess);
+                };
+                super.OnServerDisconnect += (Socket clientS) =>
+                {
+                    serverState.Remove(clientS);
+                };
+                super.OnServerReceive += (Socket clientS, byte[] mess) =>
+                {
+
+                };
+            }
         }
-        protected override byte[] BeginToSend(byte[] mess)
+        protected static byte[] ConnMess
         {
-            return base.BeginToSend(mess);
+            get;
+        }
+        protected static byte[] ConnBack
+        {
+            get;
+        }
+        static internal void StartServer()
+        {
+            super.OpenServer();
+        }
+        static internal void StopServer()
+        {
+            super.CloseServer();
+        }
+        internal int ConnectToServer(IPAddress serverAddr,int serverPort)
+        {
+            var ret = super.CreateClient(serverAddr, serverPort);
+            return ret;
+        }
+        internal void DisconnectToServer(int index)
+        {
+            super.CloseClient(index);
         }
     }
 }
