@@ -172,8 +172,11 @@ namespace ZjSmallGameCollection
                 gameriver_p1["type"].InnerText = "local";
             else if(player1_auto.Checked)
                 gameriver_p1["type"].InnerText = "auto";
-            else
+            else if(player1_network.Checked)
+            {
                 gameriver_p1["type"].InnerText = "network";
+                MessageBox.Show("网络对战功能正在开发中！暂时无法使用");
+            }
             gameriver_p1["name"].InnerText = player1_name.Text;
             gameriver_p1["AIdt"].InnerText = player1_AIdt.Text;
             gameriver_p1["server"].InnerText = (player1_server.CheckState == CheckState.Checked) ? "true" : "false";
@@ -184,8 +187,11 @@ namespace ZjSmallGameCollection
                 gameriver_p2["type"].InnerText = "local";
             else if(player2_auto.Checked)
                 gameriver_p2["type"].InnerText = "auto";
-            else
+            else if(player2_network.Checked)
+            {
                 gameriver_p2["type"].InnerText = "network";
+                MessageBox.Show("网络对战功能正在开发中！暂时无法使用");
+            }
             gameriver_p2["name"].InnerText = player2_name.Text;
             gameriver_p2["AIdt"].InnerText = player2_AIdt.Text;
             gameriver_p2["server"].InnerText = (player2_server.CheckState == CheckState.Checked) ? "true" : "false";
